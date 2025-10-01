@@ -1,2 +1,2 @@
 # farcaster
-Develop tool creation and application testing for UNLV capstone
+Develop tools and application testing for UNLV capstone
