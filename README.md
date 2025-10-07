@@ -16,7 +16,11 @@ npm install
 
 
 IF YOU GET AN ERROR, run these commands, then run npm install again:
+
 unset ESBUILD_BINARY_PATH
+
+
+
 rm -rf node_modules package-lock.json
 
 
