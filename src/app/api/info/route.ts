@@ -1,64 +1,123 @@
-// app/api/info/route.ts
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { createPublicClient, http, formatEther } from "viem";
 
-type TimerItem = { name: string; time: string };
+const RACE_ABI = [
+  { type: "function", name: "activeRaceIds", stateMutability: "view", inputs: [], outputs: [{ type: "uint256[]" }] },
+  {
+    type: "function",
+    name: "getRace",
+    stateMutability: "view",
+    inputs: [{ name: "raceId", type: "uint256" }],
+    outputs: [
+      { type: "string" },    // name
+      { type: "string[]" },  // racers
+      { type: "uint64" },    // startTime
+      { type: "uint64" },    // lockTime
+      { type: "bool" },      // settled
+      { type: "uint8" },     // winnerIndex
+      { type: "uint256" },   // totalPool
+      { type: "uint256[]" }, // poolByRacer
+      { type: "bool" },      // vrfRequested
+    ],
+  },
+] as const;
 
-function infoPath() {
-  // store the file under /public so it's also accessible as /info.txt
-  return path.join(process.cwd(), "public", "info.txt");
-}
+// -----------------------------------------------------------------------------
+// Configuration (consider moving to .env.local)
+// -----------------------------------------------------------------------------
+const RPC_URL = "http://block.techiegogo.com:8545"; // or http://127.0.0.1:8545
+const RACE_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 
-async function readInfo(): Promise<TimerItem[]> {
-  const p = infoPath();
-  const raw = await fs.readFile(p, "utf8");
-  const data = JSON.parse(raw);
-  if (!Array.isArray(data)) return [];
-  return data;
-}
+const client = createPublicClient({ transport: http(RPC_URL) });
 
-async function writeInfo(items: TimerItem[]): Promise<void> {
-  const p = infoPath();
-  // pretty print for readability during dev
-  await fs.writeFile(p, JSON.stringify(items, null, 2), "utf8");
+// Shape a single race into a rich object (and backward-compatible fields)
+function shapeRace(
+  id: bigint,
+  tuple: [string, string[], bigint, bigint, boolean, number, bigint, bigint[], boolean]
+) {
+  const [name, racers, startTime, lockTime, settled, winnerIndex, totalPool, poolByRacer, vrfRequested] = tuple;
+  const now = Math.floor(Date.now() / 1000);
+  const locked = now >= Number(lockTime);
+  const secondsToLock = Math.max(0, Number(lockTime) - now);
+  const status: "open" | "locked" | "settled" = settled ? "settled" : locked ? "locked" : "open";
+
+  return {
+    // legacy/whitebar compatibility
+    id: String(id),
+    name,
+    time: new Date(Number(lockTime) * 1000).toISOString(),
+
+    // full data for races/[id]
+    raceId: String(id),
+    racers,
+    startTime: Number(startTime),
+    lockTime: Number(lockTime),
+    settled,
+    winnerIndex: Number(winnerIndex),
+    vrfRequested,
+
+    // raw (stringified)
+    totalPoolWei: totalPool.toString(),
+    poolByRacerWei: poolByRacer.map((x) => x.toString()),
+
+    // pretty
+    totalPoolEth: formatEther(totalPool),
+    poolByRacerEth: poolByRacer.map(formatEther),
+
+    // UI helpers
+    status,
+    locked,
+    secondsToLock,
+  };
 }
 
 export async function GET() {
   try {
-    const items = await readInfo();
-    return NextResponse.json(items, { status: 200 });
-  } catch (e) {
-    return NextResponse.json({ error: "Failed to read info" }, { status: 500 });
+    if (!RACE_ADDRESS || !RACE_ADDRESS.startsWith("0x") || RACE_ADDRESS.length !== 42) {
+      throw new Error("Invalid RACE_ADDRESS");
+    }
+
+    // 1) Get active IDs
+    const ids = (await client.readContract({
+      address: RACE_ADDRESS as `0x${string}`,
+      abi: RACE_ABI,
+      functionName: "activeRaceIds",
+    })) as bigint[];
+
+    if (!ids?.length) return NextResponse.json([], { status: 200 });
+
+    // 2) Fetch each race individually (NO multicall)
+    const tuples = await Promise.all(
+      ids.map((id) =>
+        client.readContract({
+          address: RACE_ADDRESS as `0x${string}`,
+          abi: RACE_ABI,
+          functionName: "getRace",
+          args: [id],
+        }) as Promise<[string, string[], bigint, bigint, boolean, number, bigint, bigint[], boolean]>
+      )
+    );
+
+    // 3) Shape, filter, sort
+    const nowSec = Math.floor(Date.now() / 1000);
+    const races = tuples
+      .map((tuple, i) => shapeRace(ids[i], tuple))
+      .filter((r) => r.lockTime > nowSec || r.settled) // keep upcoming + settled
+      .sort((a, b) => a.lockTime - b.lockTime);
+
+    return NextResponse.json(races, { status: 200 });
+  } catch (e: any) {
+    console.error("❌ /api/info error:", e);
+    return NextResponse.json(
+      { error: "Failed to read from contract", details: String(e?.message ?? e) },
+      { status: 500 },
+    );
   }
 }
 
-/**
- * DELETE /api/info?name=...&time=...
- * Removes a single item that matches both name and time.
- */
-export async function DELETE(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const name = searchParams.get("name");
-    const time = searchParams.get("time");
-
-    if (!name || !time) {
-      return NextResponse.json({ error: "Missing name or time" }, { status: 400 });
-    }
-
-    const items = await readInfo();
-    const beforeLen = items.length;
-    const next = items.filter((i) => !(i.name === name && i.time === time));
-
-    if (next.length === beforeLen) {
-      // nothing removed; return 204 to indicate "no content/changes"
-      return NextResponse.json({ removed: false }, { status: 204 });
-    }
-
-    await writeInfo(next);
-    return NextResponse.json({ removed: true }, { status: 200 });
-  } catch (e) {
-    return NextResponse.json({ error: "Failed to update info" }, { status: 500 });
-  }
+export async function DELETE() {
+  return NextResponse.json(
+    { error: "Delete not supported; races are on-chain" },
+    { status: 405 },
+  );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -12,25 +12,54 @@ import { useWallet } from "~/lib/wallet-context";
 import { toast } from "sonner";
 import Link from "next/link";
 
-type JsonHorse = {
-  id: string;
+// ----- Chain read (fallback) -----
+import type { Abi } from "viem";
+import { createPublicClient, custom, http } from "viem";
+
+// Minimal ABI for RaceParimutuelETH_VRF.getRace(uint256)
+const RACE_ABI = [
+  {
+    type: "function",
+    name: "getRace",
+    stateMutability: "view",
+    inputs: [{ name: "raceId", type: "uint256" }],
+    outputs: [
+      { type: "string" },      // name
+      { type: "string[]" },    // racers
+      { type: "uint64" },      // startTime
+      { type: "uint64" },      // lockTime
+      { type: "bool" },        // settled
+      { type: "uint8" },       // winnerIndex
+      { type: "uint256" },     // totalPool
+      { type: "uint256[]" },   // poolByRacer
+      { type: "bool" },        // vrfRequested
+    ],
+  },
+] as const satisfies Abi;
+
+// You can also put these in NEXT_PUBLIC_ env vars if you like.
+// For fallback read, we’ll prefer window.ethereum; else use RPC_URL if present.
+const RPC_URL = "http://block.techiegogo.com:8545"; // or http://127.0.0.1:8545
+const RACE_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
+
+// ---------------- UI Types ----------------
+type UiHorse = {
+  id: number;         // index in racers[]
   name: string;
-  jockey: string;
-  odds: string;
-  color: string;
+  jockey: string;     // not on-chain; “—”
+  odds: number;       // implied multiple: totalPool/poolByRacer[i] (if poolByRacer>0)
+  color: string;      // a tailwind class picked by index
 };
 
-type JsonRace = {
-  id: string;
+type UiRace = {
+  id: number;
   name: string;
-  time: string;
-  choices: string[];
-  stats: Record<string, any>;
-  location: string;
-  distance: string;
-  track: string;
-  prize: string;
-  horses: JsonHorse[];
+  location: string;   // not on-chain
+  raceDate: Date;
+  distance: string;   // not on-chain
+  track: string;      // not on-chain
+  prize: string;      // display-only; we’ll show “Pool: X ETH” here if you want
+  horses: UiHorse[];
 };
 
 // ---- Helpers ----
@@ -45,64 +74,194 @@ const formatStartsIn = (target: Date) => {
   return `${m}m`;
 };
 
+// deterministic palette for horse colors
+const COLOR_CLASSES = [
+  "bg-blue-600", "bg-rose-600", "bg-emerald-600", "bg-amber-600",
+  "bg-fuchsia-600", "bg-cyan-600", "bg-indigo-600", "bg-lime-600",
+  "bg-teal-600", "bg-orange-600", "bg-pink-600", "bg-purple-600",
+];
+
+function pickColor(idx: number) {
+  return COLOR_CLASSES[idx % COLOR_CLASSES.length];
+}
+
+function weiToEthStr(bi: bigint) {
+  // lightweight converter, display 4 decimals
+  const s = bi.toString().padStart(19, "0"); // ensure at least 19 digits
+  const whole = s.slice(0, -18) || "0";
+  const frac = s.slice(-18).slice(0, 4).padEnd(4, "0");
+  return `${whole}.${frac}`;
+}
+
+// ---------------- Page ----------------
 export default function RaceDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { balance, addBet } = useWallet();
 
-  const [race, setRace] = useState<{
-    id: number;
-    name: string;
-    location: string;
-    raceDate: Date;
-    distance: string;
-    track: string;
-    prize: string;
-    horses: { id: number; name: string; jockey: string; odds: number; color: string }[];
-  } | null>(null);
-
+  const [race, setRace] = useState<UiRace | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [selectedHorses, setSelectedHorses] = useState<number[]>([]);
   const [betAmounts, setBetAmounts] = useState<Record<number, string>>({});
 
-  // ---- Fetch Race Data ----
+  // ---- Try API first, then fall back to direct chain read via viem ----
   useEffect(() => {
     let alive = true;
-    const fetchRace = async () => {
+
+    async function fromApi(): Promise<UiRace | null> {
+      // Prefer rich shape: /api/info?full=1
+      let res = await fetch("/api/info?full=1", { cache: "no-store" });
+      if (!res.ok) {
+        // fallback to basic
+        res = await fetch("/api/info", { cache: "no-store" });
+        if (!res.ok) return null;
+      }
+      const data = (await res.json()) as any[];
+      // find by raceId (preferred) or id (string)
+      const found =
+        data.find((r) => String(r.raceId) === params.id) ??
+        data.find((r) => String(r.id) === params.id);
+      if (!found) return null;
+
+      const lockTimeSec: number | null =
+        typeof found.lockTime !== "undefined" ? Number(found.lockTime) :
+        found.time ? Math.floor(Date.parse(String(found.time)) / 1000) : null;
+
+      const name: string = found.name ?? `Race ${params.id}`;
+      const racers: string[] = Array.isArray(found.racers) ? found.racers : [];
+      const totalPoolWei: bigint = found.totalPoolWei ? BigInt(found.totalPoolWei) : BigInt(found.totalPool ?? 0);
+      const poolByRacerWei: bigint[] = Array.isArray(found.poolByRacerWei)
+        ? found.poolByRacerWei.map((x: any) => BigInt(x))
+        : Array.isArray(found.poolByRacer)
+        ? found.poolByRacer.map((x: any) => BigInt(x))
+        : racers.map(() => 0n);
+
+      const ui: UiRace = {
+        id: Number(params.id),
+        name,
+        location: "—",               // not on-chain
+        raceDate: new Date((lockTimeSec ?? Math.floor(Date.now() / 1000)) * 1000),
+        distance: "—",               // not on-chain
+        track: "—",                  // not on-chain
+        prize: totalPoolWei ? `Pool: ${weiToEthStr(totalPoolWei)} ETH` : "—",
+        horses: racers.map((nm, i) => {
+          const pool = poolByRacerWei[i] ?? 0n;
+          const odds =
+            pool > 0n && totalPoolWei > 0n
+              ? Number((totalPoolWei * 1_000_000n) / pool) / 1_000_000 // multiple with 6dp
+              : 1; // undefined pool => show 1x
+          return {
+            id: i,
+            name: nm,
+            jockey: "—",
+            odds,
+            color: pickColor(i),
+          };
+        }),
+      };
+      return ui;
+    }
+
+    async function fromChain(): Promise<UiRace | null> {
+      if (!RACE_ADDRESS) return null;
+
+      // prefer window.ethereum (user’s wallet). If not available, use RPC_URL if provided.
+      const transport = typeof window !== "undefined" && (window as any).ethereum
+        ? custom((window as any).ethereum)
+        : RPC_URL
+        ? http(RPC_URL)
+        : null;
+
+      if (!transport) return null;
+
+      const client = createPublicClient({ transport });
+      const raceId = BigInt(params.id);
+
+      try {
+        const res = await client.readContract({
+          address: RACE_ADDRESS,
+          abi: RACE_ABI,
+          functionName: "getRace",
+          args: [raceId],
+        });
+
+        const [
+          name,
+          racers,
+          startTime,
+          lockTime,
+          settled,
+          winnerIndex,
+          totalPool,
+          poolByRacer,
+        ] = res as unknown as [
+          string,
+          string[],
+          bigint,
+          bigint,
+          boolean,
+          number,
+          bigint,
+          bigint[],
+        ];
+
+        const ui: UiRace = {
+          id: Number(params.id),
+          name: name ?? `Race ${params.id}`,
+          location: "—",
+          raceDate: new Date(Number(lockTime) * 1000),
+          distance: "—",
+          track: "—",
+          prize: totalPool ? `Pool: ${weiToEthStr(totalPool)} ETH` : "—",
+          horses: (racers || []).map((nm, i) => {
+            const pool = (poolByRacer || [])[i] ?? 0n;
+            const odds =
+              pool > 0n && totalPool > 0n
+                ? Number((totalPool * 1_000_000n) / pool) / 1_000_000
+                : 1;
+            return {
+              id: i,
+              name: nm,
+              jockey: "—",
+              odds,
+              color: pickColor(i),
+            };
+          }),
+        };
+        return ui;
+      } catch (e) {
+        console.error("Direct chain read failed:", e);
+        return null;
+      }
+    }
+
+    (async () => {
       try {
         setLoading(true);
-        const res = await fetch("/info.txt", { cache: "no-store" });
-        if (!res.ok) throw new Error(`Failed to fetch info.txt (${res.status})`);
-        const data = (await res.json()) as JsonRace[];
-        const found = data.find((r) => r.id === params.id);
-        if (!found) throw new Error(`Race ${params.id} not found`);
+        setErr(null);
 
-        const mapped = {
-          id: Number(found.id),
-          name: found.name,
-          location: found.location,
-          raceDate: new Date(found.time),
-          distance: found.distance,
-          track: found.track,
-          prize: found.prize,
-          horses: found.horses.map((h) => ({
-            id: Number(h.id),
-            name: h.name,
-            jockey: h.jockey,
-            odds: Number(h.odds),
-            color: h.color,
-          })),
-        };
+        // 1) Try your server route first (recommended)
+        const viaApi = await fromApi();
+        if (alive && viaApi) {
+          setRace(viaApi);
+          return;
+        }
 
-        if (alive) setRace(mapped);
+        // 2) Fallback: direct chain read
+        const viaChain = await fromChain();
+        if (alive && viaChain) {
+          setRace(viaChain);
+          return;
+        }
+
+        if (alive) setErr(`Race ${params.id} not found`);
       } catch (e: any) {
-        if (alive) setErr(e.message || "Failed to load race data");
+        if (alive) setErr(e?.message ?? "Failed to load race data");
       } finally {
         if (alive) setLoading(false);
       }
-    };
+    })();
 
-    fetchRace();
     return () => {
       alive = false;
     };
@@ -128,6 +287,9 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
         description: "Select at least one horse.",
       });
 
+    // NOTE: Current app uses a local “coins” wallet. On-chain ETH bet
+    // would call contract.bet(raceId, racerIndex) with msg.value.
+    // We keep your existing client flow intact here.
     let totalSpent = 0;
     const bets = selectedHorses
       .map((id) => {
@@ -158,7 +320,6 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
       potentialWin: Math.round(amount * horse.odds),
     }));
 
-    // ---- Save bets ----
     const existingBets = JSON.parse(localStorage.getItem("userBets") || "[]");
     const allBets = [...existingBets, ...finalBets];
     localStorage.setItem("userBets", JSON.stringify(allBets));
@@ -172,8 +333,7 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
   };
 
   if (loading) return <div className="p-6 text-center">Loading race info…</div>;
-  if (err || !race)
-    return <div className="p-6 text-center text-red-500">{err}</div>;
+  if (err || !race) return <div className="p-6 text-center text-red-500">{err}</div>;
 
   const startsIn = formatStartsIn(race.raceDate);
 
@@ -192,7 +352,7 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
         </div>
       </header>
 
-      {/* Simplified Top Card */}
+      {/* Top Card */}
       <main className="max-w-lg mx-auto px-8 py-6 space-y-6">
         <Card className="p-4 flex flex-col justify-between min-h-[130px]">
           <div className="space-y-2 text-center">
@@ -201,24 +361,20 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
             </Badge>
             <div className="flex justify-center items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>
-                Starts in {startsIn}{" "}
-              </span>
+              <span>Starts in {startsIn}</span>
             </div>
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground mt-4 border-t pt-3">
-            <span>
-              {race.distance}
-            </span>
+            <span>{race.distance}</span>
             <span className="flex items-center gap-1 text-foreground font-semibold">
               <Trophy className="h-4 w-4 text-primary" />
-              {race.prize} coins
+              {race.prize || "—"}
             </span>
           </div>
         </Card>
 
-        {/* Horse Selection */}
+        {/* Horse (racer) Selection */}
         <section>
           <h2 className="text-xl font-bold mb-4">Select Horse(s)</h2>
           <div className="space-y-3">
@@ -246,9 +402,9 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-primary">
-                      {horse.odds}x
+                      {Number.isFinite(horse.odds) ? `${horse.odds.toFixed(2)}x` : "—"}
                     </div>
-                    <div className="text-xs text-muted-foreground">odds</div>
+                    <div className="text-xs text-muted-foreground"></div>
                   </div>
                 </div>
               </Card>
@@ -264,7 +420,7 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
               const horse = race.horses.find((h) => h.id === horseId)!;
               const amount = betAmounts[horseId] || "";
               const potentialWin = amount
-                ? (Number(amount) * horse.odds).toFixed(0)
+                ? (Number(amount) * (Number.isFinite(horse.odds) ? horse.odds : 1)).toFixed(0)
                 : "0";
 
               return (
