@@ -1,6 +1,0 @@
-python create_race.py --name "Race seven" --racers "Thunder Strike,Lightning Bolt,Storm Chaser,Wind Runner,Fire Dancer,Ocean Wave,Desert Fox"     --star
-t $(( $(date +%s) + 100000 )) --lock $(( $(date +%s) + 400000 ))
-
-python find_request_id.py
-
- python mock_fulfill.py   0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512   1   --coordinator 0x5FbDB2315678afecb367f032d93F642f64180aa3

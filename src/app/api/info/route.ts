@@ -25,7 +25,7 @@ const RACE_ABI = [
 // -----------------------------------------------------------------------------
 // Configuration (consider moving to .env.local)
 // -----------------------------------------------------------------------------
-const RPC_URL = "http://block.techiegogo.com:8545"; // or http://127.0.0.1:8545
+const RPC_URL = "http://127.0.0.1:8545"; // or http://127.0.0.1:8545
 const RACE_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 
 const client = createPublicClient({ transport: http(RPC_URL) });
