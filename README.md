@@ -87,11 +87,15 @@ SETTING UP RACES
 3. find script you want, 01 will let you create races that get updated onto the app, :
 
 4. read howtouse.txt:
-```exapleas are given on how to use each script in the terminal.
-the bottom hold an example of the flow that should happen between races.```
+```
+exapleas are given on how to use each script in the terminal.
+the bottom hold an example of the flow that should happen between races.
+```
 
-```Only 5 ACTIVE races can be held at once time, just because the timer expires dosent mean the race isnt active, race is only deactivated when settle race is ran
-to see active races run 00-status.sh```
+```
+Only 5 ACTIVE races can be held at once time, just because the timer expires dosent mean the race isnt active, race is only deactivated when settle race is ran
+to see active races run 00-status.sh
+```
 
 
 
