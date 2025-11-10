@@ -1,6 +1,48 @@
-/node_modules
-/build
-/coverage
-/venv
+# Node.js / JavaScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build output
+.next/
+out/
+dist/
+build/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Python / Testing
+venv/
+__pycache__/
+tests/__pycache__/
+
+# Coverage reports
+coverage/
 .coverage
-/tests/__pycache__
+
+# Environment Variables
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+# IDE / System
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Miscellaneous
+tmp/
+temp/
+*.tgz
