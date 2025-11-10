@@ -25,10 +25,12 @@ Develop tools and application testing for UNLV capstone
 
     ```npm install --include=dev```
 
-5. Setup python venv
+5. Setup python venv:
+    ```apt install python3.12-venv```
+    ```then```
     ```python -m venv venv``` or ```python3 -m venv venv```
 
-6. Install python requirements.txt
+6. Install python requirements.txt:
     - ```source venv/bin/activate```
     - ```pip install -r requirements.txt```
 
@@ -48,6 +50,57 @@ IF YOU GET AN ERROR, run these commands, then run npm install again:
 ```npm install```
 
 --------------------------------------------------------------------
+
+SETTING UP LOCAL BLOCK CHAIN
+
+
+1. download forge (only once):
+    ```curl -L https://foundry.paradigm.xyz | bash```
+
+2.refresh terminal:
+ ```source ~/.bashrc```
+```(or close the terminal and reopen it)```
+
+3. run the foundryup command to install forge (only once):
+```foundryup```
+
+4.refresh terminal:
+```close the terminal and reopen it```
+
+5. check if install worked:
+```forge --version```
+
+6. GO into farcaster/Oracle Control/horsey:
+
+7. run start-local:
+```./start-local.sh```
+```(if it dosent work run "chmod +x start-local.sh" first)```
+
+8. ```Congrats anvil is now running, this is REQUIRED for the app to see races aswell as to set races and other info```
+
+SETTING UP RACES
+
+1. setup block chain:
+
+2. go to folder: farcaster/Oracle Control/scripts:
+
+3. find script you want, 01 will let you create races that get updated onto the app, :
+
+4. read howtouse.txt:
+```
+exapleas are given on how to use each script in the terminal.
+the bottom hold an example of the flow that should happen between races.
+```
+
+```
+Only 5 ACTIVE races can be held at once time, just because the timer expires dosent mean the race isnt active, race is only deactivated when settle race is ran
+to see active races run 00-status.sh
+```
+
+
+
+--------------------------------------------------------------------
+
 
 ## Using localhost for development: ##
 
