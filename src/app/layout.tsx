@@ -5,6 +5,7 @@ import { Providers } from '~/app/providers';
 import { APP_NAME, APP_DESCRIPTION } from '~/lib/constants';
 import {WalletProvider} from "~/lib/wallet-context";
 import {Toaster} from "sonner";
+import Navbar from "~/components/Navbar";
 
 export const metadata: Metadata = {
   title: APP_NAME,
@@ -19,12 +20,13 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
-        <WalletProvider>
             <Providers>
+                <WalletProvider>
+                  <Navbar />
                 {children}
+                </WalletProvider> 
             </Providers>
             <Toaster />
-        </WalletProvider>
       </body>
     </html>
   );
