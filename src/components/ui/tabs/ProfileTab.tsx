@@ -1,51 +1,83 @@
 "use client";
 
-import {useWallet} from "~/lib/wallet-context";
-import {toast} from "sonner";
-import {Avatar, AvatarFallback, AvatarImage} from "~/components/ui/avatar";
-import {Badge} from "~/components/ui/badge";
-import {Card} from "~/components/ui/card";
-import {Coins, Trophy, History, TrendingUp} from "lucide-react";
-import {Button} from "~/components/ui/button";
+import { useState } from "react";
+import { useWallet } from "~/lib/wallet-context";
+import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Badge } from "~/components/ui/badge";
+import { Card } from "~/components/ui/card";
+import { Coins } from "lucide-react";
+import { Button } from "~/components/ui/button";
+import { bet } from "ponder:schema";
 
 /**
- * HomeTab component displays the main landing content for the mini app.
- * 
- * This is the default tab that users see when they first open the mini app.
- * It provides a simple welcome message and placeholder content that can be
- * customized for specific use cases.
- * 
- * @example
- * ```tsx
- * <HomeTab />
- * ```
+ * ProfileTab displays user info, wallet, achievements, and recent activity.
  */
 export function ProfileTab() {
-    const { balance, bets, stats, addCoins, updateBetStatus } = useWallet()
+    const { balance, bets, addCoins, updateBetStatus } = useWallet();
+    const [selectedBadge, setSelectedBadge] = useState<any>(null);
 
     const handleAddCoins = () => {
-        addCoins(500)
+        addCoins(500);
         toast("Coins Added!", {
             description: "500 test coins have been added to your wallet.",
-        })
-    }
+        });
+    };
 
     const handleSimulateWin = (betId: string) => {
-        updateBetStatus(betId, "won")
+        updateBetStatus(betId, "won");
         toast("Congratulations!", {
             description: "Your bet won!",
-        })
-    }
+        });
+    };
 
     const handleSimulateLoss = (betId: string) => {
-        updateBetStatus(betId, "lost")
+        updateBetStatus(betId, "lost");
         toast("Better luck next time", {
             description: "Your bet lost.",
-        })
-    }
+        });
+    };
+
+    const badges = [
+        {
+            id: 1,
+            name: "First Bet",
+            img: "/AchievementsBadges/1.png",
+            description: "Awarded for placing your first bet.",
+            unlocked: bets.length >= 1, //unlock until user place 1 bet
+        },
+        {
+            id: 2,
+            name: "Winner",
+            img: "/AchievementsBadges/2.png",
+            description: "Earned by winning your first race.",
+            unlocked: bets.some(b => b.status === "won"),
+        },
+        {
+            id: 3,
+            name: "Lucky Streak",
+            img: "/AchievementsBadges/3.png",
+            description: "Earned by winning three bets in a row.",
+            unlocked: (() => {
+                const wins = bets
+                    .filter(b => b.status === "won")
+                    .sort((a, b) => a.timestamp - b.timestamp);
+    
+                let streak = 1;
+                for (let i = 1; i < wins.length; i++) {
+                    if (wins[i - 1].timestamp < wins[i].timestamp) streak++;
+                    else streak = 1;
+                }
+                return streak >= 3;
+            })(),
+
+        },
+        
+    ];
 
     return (
         <div className="min-h-screen pb-20">
+            {/* HEADER */}
             <header className="border-b border-border bg-card rounded-lg">
                 <div className="max-w-lg mx-auto px-4 py-6">
                     <div className="flex items-center gap-4">
@@ -64,7 +96,10 @@ export function ProfileTab() {
                 </div>
             </header>
 
+            {/* MAIN */}
             <main className="max-w-lg mx-auto py-6 space-y-6">
+
+                {/* WALLET SECTION */}
                 <section>
                     <h2 className="text-xl font-bold mb-4">Wallet</h2>
                     <Card className="p-6 bg-gradient-to-br from-primary/20 to-secondary">
@@ -82,44 +117,65 @@ export function ProfileTab() {
                     </Card>
                 </section>
 
+                {/* ACHIEVEMENTS SECTION */}
                 <section>
-                    <h2 className="text-xl font-bold mb-4">Statistics</h2>
-                    <div className="grid grid-cols-2 gap-3">
-                        <Card className="p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Trophy className="h-4 w-4 text-primary" />
-                                <span className="text-sm text-muted-foreground">Total Wins</span>
+                    <h2 className="text-xl font-bold mb-4">Achievements</h2>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                        {badges.map((badge) => (
+                            <div key={badge.id}>
+                                <button
+                                    onClick={() => badge.unlocked && setSelectedBadge(badge)}
+                                    disabled={!badge.unlocked}
+                                    className="flex flex-col items-center hover:scale-105 transition-transform disabled:cursor-not-allowed"                
+                                >
+                                    <img
+                                        src={badge.img}
+                                        alt={badge.name}
+                                        className={`w-20 h-20 rounded-full object-cover transition-all
+                                            ${badge.unlocked ? "" : "opacity-30 grayscale"}`}
+                                    />
+                                    <span className={`mt-2 text-sm font-medium ${badge.unlocked ? "" : "text-muted-foreground"}`} >{badge.name}</span>
+                                </button>
                             </div>
-                            <div className="text-3xl font-bold">{stats.totalWins}</div>
-                        </Card>
-                        <Card className="p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <History className="h-4 w-4 text-primary" />
-                                <span className="text-sm text-muted-foreground">Total Bets</span>
-                            </div>
-                            <div className="text-3xl font-bold">{stats.totalBets}</div>
-                        </Card>
-                        <Card className="p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <TrendingUp className="h-4 w-4 text-primary" />
-                                <span className="text-sm text-muted-foreground">Win Rate</span>
-                            </div>
-                            <div className="text-3xl font-bold">{stats.winRate.toFixed(0)}%</div>
-                        </Card>
-                        <Card className="p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Coins className="h-4 w-4 text-primary" />
-                                <span className="text-sm text-muted-foreground">Total Won</span>
-                            </div>
-                            <div className="text-3xl font-bold">{stats.totalWon.toLocaleString()}</div>
-                        </Card>
+                        ))}
                     </div>
+
+                    {/* Simple Popup Modal */}
+                    {selectedBadge && (
+                        <div
+                            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                            onClick={() => setSelectedBadge(null)}
+                        >
+                            <div
+                                className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg max-w-sm text-center border border-border"
+                                style={{ backgroundColor: "#111827", borderColor: "#1f2937" }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <img
+                                    src={selectedBadge.img}
+                                    alt={selectedBadge.name}
+                                    className="w-24 h-24 mx-auto rounded-full"
+                                />
+                                <h3 className="text-lg font-bold mt-4">{selectedBadge.name}</h3>
+
+                                <p className="text-sm text-muted-foreground mt-2">
+                                    {selectedBadge.description}
+                                </p>
+                                <Button className="mt-4" onClick={() => setSelectedBadge(null)}>
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </section>
 
+                {/* RECENT ACTIVITY SECTION */}
                 <section>
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-bold">Recent Activity</h2>
-                        {bets.length === 0 && <span className="text-sm text-muted-foreground">No bets yet</span>}
+                        {bets.length === 0 && (
+                            <span className="text-sm text-muted-foreground">No bets yet</span>
+                        )}
                     </div>
                     <div className="space-y-3">
                         {bets.slice(0, 10).map((bet) => (
@@ -131,19 +187,27 @@ export function ProfileTab() {
                                             <p className="text-sm text-muted-foreground">
                                                 {bet.horseName} • {bet.odds}x odds
                                             </p>
-                                            <p className="text-xs text-muted-foreground mt-1">{new Date(bet.timestamp).toLocaleString()}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {new Date(bet.timestamp).toLocaleString()}
+                                            </p>
                                         </div>
                                         <div className="text-right">
                                             <div className="font-bold">{bet.amount} coins</div>
                                             <div className="text-sm text-muted-foreground">Bet amount</div>
                                             {bet.status === "pending" && (
-                                                <Badge className="mt-2 bg-secondary text-secondary-foreground">Pending</Badge>
+                                                <Badge className="mt-2 bg-secondary text-secondary-foreground">
+                                                    Pending
+                                                </Badge>
                                             )}
                                             {bet.status === "won" && (
-                                                <Badge className="mt-2 bg-primary/20 text-primary border-primary/30">Won</Badge>
+                                                <Badge className="mt-2 bg-primary/20 text-primary border-primary/30">
+                                                    Won
+                                                </Badge>
                                             )}
                                             {bet.status === "lost" && (
-                                                <Badge className="mt-2 bg-destructive/20 text-destructive border-destructive/30">Lost</Badge>
+                                                <Badge className="mt-2 bg-destructive/20 text-destructive border-destructive/30">
+                                                    Lost
+                                                </Badge>
                                             )}
                                         </div>
                                     </div>
@@ -168,7 +232,9 @@ export function ProfileTab() {
                                         </div>
                                     )}
                                     {bet.status === "won" && (
-                                        <div className="text-sm text-primary font-semibold">Won: +{bet.potentialWin} coins</div>
+                                        <div className="text-sm text-primary font-semibold">
+                                            Won: +{bet.potentialWin} coins
+                                        </div>
                                     )}
                                 </div>
                             </Card>
@@ -178,4 +244,4 @@ export function ProfileTab() {
             </main>
         </div>
     );
-} 
+}
