@@ -3,8 +3,10 @@ import type { Metadata } from 'next';
 import '~/app/globals.css';
 import { Providers } from '~/app/providers';
 import { APP_NAME, APP_DESCRIPTION } from '~/lib/constants';
-import {WalletProvider} from "~/lib/wallet-context";
-import {Toaster} from "sonner";
+import { WalletProvider } from '~/lib/wallet-context';
+import { Toaster } from 'sonner';
+// import { WagmiProvider } from "wagmi";
+// import { wagmiConfig } from "~/lib/wagmi";
 
 export const metadata: Metadata = {
   title: APP_NAME,
@@ -19,12 +21,12 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
-        <WalletProvider>
+          <WalletProvider>
             <Providers>
-                {children}
+              {children}
+              <Toaster />
             </Providers>
-            <Toaster />
-        </WalletProvider>
+          </WalletProvider>
       </body>
     </html>
   );

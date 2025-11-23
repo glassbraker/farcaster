@@ -8,7 +8,8 @@ import { Card } from "~/components/ui/card";
 import { Coins, Trophy, History, TrendingUp } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useConnect, useDisconnect, WagmiProvider} from "wagmi";
+import { wagmiConfig } from "~/lib/wagmi";
 import { useMiniApp } from "@neynar/react";
 
 export function ProfileTab() {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.27;
 import "@forge/Script.sol";
 import {Horsey} from "../src/Horsey.sol";
 import {MockEntropy} from "../src/MockEntropy.sol";
+import "../src/TestCoin.sol";
 
 contract DeployScript is Script {
     function run() external {
@@ -20,6 +21,9 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         Horsey horsey = new Horsey(resolver, entropy, entropyProvider);
+
+        TestCoin testCoin = new TestCoin();
+        console.log("TestCoin deployed at:", address(testCoin));
 
         console.log("Horsey deployed at:", address(horsey));
         console.log("Resolver:", resolver);
@@ -63,10 +67,20 @@ contract DeployLocalScript is Script {
         // Deploy Horsey
         Horsey horsey = new Horsey(resolver, address(mockEntropy), provider);
 
+        TestCoin testCoin = new TestCoin();
+        console.log("TestCoin deployed at:", address(testCoin));
+
         console.log("Horsey deployed at:", address(horsey));
         console.log("Resolver:", resolver);
         console.log("Entropy Provider:", provider);
 
         vm.stopBroadcast();
+    }
+}
+
+contract Deploy {
+    function run() external returns (TestCoin) {
+        TestCoin coin = new TestCoin();
+        return coin;
     }
 }

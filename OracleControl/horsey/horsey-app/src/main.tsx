@@ -5,9 +5,9 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { WagmiProvider } from 'wagmi'
 
-import App from './App.tsx'
-import { config } from './wagmi.ts'
-import { ponderClient } from './lib/ponder.ts'
+import App from './App.jsx'
+import { config } from './wagmi.js'
+import { ponderClient } from './lib/ponder.js'
 
 import './index.css'
 

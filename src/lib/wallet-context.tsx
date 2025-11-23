@@ -2,6 +2,10 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, WagmiProvider } from "wagmi";
+import { wagmiConfig } from '~/lib/wagmi';
+import { TestCoinAbi } from "~/lib/abis/TestCoinAbi.ts";
+import {TEST_COIN_ADDRESS} from "~/lib/TestCoin.address.ts";
 
 interface Bet {
     id: string
@@ -34,57 +38,68 @@ interface WalletContextType {
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
+
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-    const [balance, setBalance] = useState(1000)
-    const [bets, setBets] = useState<Bet[]>([])
+    const { address } = useAccount();
+    const [bets, setBets] = useState<Bet[]>([]);
 
-    // Load from localStorage on mount
+    // On-chain TestCoin balance
+    const { data: onChainBalance, refetch: refetchBalance } = useReadContract({
+        address: TEST_COIN_ADDRESS,
+        abi: TestCoinAbi,
+        functionName: "balanceOf",
+        args: [address],
+    });
+
+    // Save bets to localStorage (optional, can be replaced with Ponder sync)
     useEffect(() => {
-        const savedBalance = localStorage.getItem("wallet-balance")
-        const savedBets = localStorage.getItem("wallet-bets")
-
-        if (savedBalance) setBalance(Number.parseFloat(savedBalance))
-        if (savedBets) setBets(JSON.parse(savedBets))
-    }, [])
-
-    // Save to localStorage whenever balance or bets change
-    useEffect(() => {
-        localStorage.setItem("wallet-balance", balance.toString())
-    }, [balance])
+        const savedBets = localStorage.getItem("wallet-bets");
+        if (savedBets) setBets(JSON.parse(savedBets));
+    }, []);
 
     useEffect(() => {
-        localStorage.setItem("wallet-bets", JSON.stringify(bets))
-    }, [bets])
+        localStorage.setItem("wallet-bets", JSON.stringify(bets));
+    }, [bets]);
 
+    // Mint TestCoins (addCoins)
+    const { writeContract, data: txHash } = useWriteContract();
+    const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+
+    const addCoins = async (amount: number) => {
+        if (!address) return;
+        await writeContract({
+            address: TEST_COIN_ADDRESS,
+            abi: TestCoinAbi,
+            functionName: "mint",
+            args: [address, amount],
+        });
+        // Refetch balance after mint
+        refetchBalance();
+    };
+
+    // Bets logic (local, can be refactored for Ponder integration)
     const addBet = (bet: Omit<Bet, "id" | "timestamp" | "status">) => {
         const newBet: Bet = {
             ...bet,
             id: `bet-${Date.now()}-${Math.random()}`,
             timestamp: Date.now(),
             status: "pending",
-        }
-
-        setBets((prev) => [newBet, ...prev])
-        setBalance((prev) => prev - bet.amount)
-    }
+        };
+        setBets((prev) => [newBet, ...prev]);
+        // No local balance update; on-chain balance is authoritative
+    };
 
     const updateBetStatus = (betId: string, status: "won" | "lost") => {
         setBets((prev) =>
             prev.map((bet) => {
                 if (bet.id === betId && bet.status === "pending") {
-                    if (status === "won") {
-                        setBalance((b) => b + bet.potentialWin)
-                    }
-                    return { ...bet, status }
+                    // No local balance update; on-chain balance is authoritative
+                    return { ...bet, status };
                 }
-                return bet
-            }),
-        )
-    }
-
-    const addCoins = (amount: number) => {
-        setBalance((prev) => prev + amount)
-    }
+                return bet;
+            })
+        );
+    };
 
     const stats = {
         totalBets: bets.length,
@@ -93,13 +108,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         winRate: bets.length > 0 ? (bets.filter((b) => b.status === "won").length / bets.length) * 100 : 0,
         totalWon: bets.filter((b) => b.status === "won").reduce((sum, b) => sum + b.potentialWin, 0),
         totalLost: bets.filter((b) => b.status === "lost").reduce((sum, b) => sum + b.amount, 0),
-    }
+    };
 
     return (
-        <WalletContext.Provider value={{ balance, bets, addBet, updateBetStatus, addCoins, stats }}>
+        <WalletContext.Provider value={{
+            balance: Number(onChainBalance ?? 0),
+            bets,
+            addBet,
+            updateBetStatus,
+            addCoins,
+            stats,
+        }}>
             {children}
         </WalletContext.Provider>
-    )
+    );
 }
 
 export function useWallet() {
@@ -109,3 +131,121 @@ export function useWallet() {
     }
     return context
 }
+
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+//////////// OLD FILE BELOW ///////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+
+// "use client"
+
+// import type React from "react"
+// import { createContext, useContext, useState, useEffect } from "react"
+
+// interface Bet {
+//     id: string
+//     raceId: number
+//     raceName: string
+//     horseId: number
+//     horseName: string
+//     amount: number
+//     odds: number
+//     potentialWin: number
+//     timestamp: number
+//     status: "pending" | "won" | "lost"
+// }
+
+// interface WalletContextType {
+//     balance: number
+//     bets: Bet[]
+//     addBet: (bet: Omit<Bet, "id" | "timestamp" | "status">) => void
+//     updateBetStatus: (betId: string, status: "won" | "lost") => void
+//     addCoins: (amount: number) => void
+//     stats: {
+//         totalBets: number
+//         totalWins: number
+//         totalLosses: number
+//         winRate: number
+//         totalWon: number
+//         totalLost: number
+//     }
+// }
+
+// const WalletContext = createContext<WalletContextType | undefined>(undefined)
+
+// export function WalletProvider({ children }: { children: React.ReactNode }) {
+//     const [balance, setBalance] = useState(1000)
+//     const [bets, setBets] = useState<Bet[]>([])
+
+//     // Load from localStorage on mount
+//     useEffect(() => {
+//         const savedBalance = localStorage.getItem("wallet-balance")
+//         const savedBets = localStorage.getItem("wallet-bets")
+
+//         if (savedBalance) setBalance(Number.parseFloat(savedBalance))
+//         if (savedBets) setBets(JSON.parse(savedBets))
+//     }, [])
+
+//     // Save to localStorage whenever balance or bets change
+//     useEffect(() => {
+//         localStorage.setItem("wallet-balance", balance.toString())
+//     }, [balance])
+
+//     useEffect(() => {
+//         localStorage.setItem("wallet-bets", JSON.stringify(bets))
+//     }, [bets])
+
+//     const addBet = (bet: Omit<Bet, "id" | "timestamp" | "status">) => {
+//         const newBet: Bet = {
+//             ...bet,
+//             id: `bet-${Date.now()}-${Math.random()}`,
+//             timestamp: Date.now(),
+//             status: "pending",
+//         }
+
+//         setBets((prev) => [newBet, ...prev])
+//         setBalance((prev) => prev - bet.amount)
+//     }
+
+//     const updateBetStatus = (betId: string, status: "won" | "lost") => {
+//         setBets((prev) =>
+//             prev.map((bet) => {
+//                 if (bet.id === betId && bet.status === "pending") {
+//                     if (status === "won") {
+//                         setBalance((b) => b + bet.potentialWin)
+//                     }
+//                     return { ...bet, status }
+//                 }
+//                 return bet
+//             }),
+//         )
+//     }
+
+//     const addCoins = (amount: number) => {
+//         setBalance((prev) => prev + amount)
+//     }
+
+//     const stats = {
+//         totalBets: bets.length,
+//         totalWins: bets.filter((b) => b.status === "won").length,
+//         totalLosses: bets.filter((b) => b.status === "lost").length,
+//         winRate: bets.length > 0 ? (bets.filter((b) => b.status === "won").length / bets.length) * 100 : 0,
+//         totalWon: bets.filter((b) => b.status === "won").reduce((sum, b) => sum + b.potentialWin, 0),
+//         totalLost: bets.filter((b) => b.status === "lost").reduce((sum, b) => sum + b.amount, 0),
+//     }
+
+//     return (
+//         <WalletContext.Provider value={{ balance, bets, addBet, updateBetStatus, addCoins, stats }}>
+//             {children}
+//         </WalletContext.Provider>
+//     )
+// }
+
+// export function useWallet() {
+//     const context = useContext(WalletContext)
+//     if (context === undefined) {
+//         throw new Error("useWallet must be used within a WalletProvider")
+//     }
+//     return context
+// }

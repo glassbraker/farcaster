@@ -182,12 +182,19 @@ cmd_start() {
     exit 1
   fi
 
+  # Extract TestCoin contractAddress and ABI for frontend use
+  echo -e "${CYAN}Extracting TestCoin ABI/address for frontend...${NC}"
+  node ../../../scripts/extractTestCoin.js
+
+
   CONTRACT_ADDRESS=$(jq -r '.transactions[] | select(.contractName == "Horsey") | .contractAddress' broadcast/Deploy.s.sol/31337/run-latest.json | head -1)
   ENTROPY_ADDRESS=$(jq -r '.transactions[] | select(.contractName == "MockEntropy") | .contractAddress' broadcast/Deploy.s.sol/31337/run-latest.json | head -1)
+  TESTCOIN_ADDRESS=$(jq -r '.transactions[] | select(.contractName == "TestCoin") | .contractAddress' broadcast/Deploy.s.sol/31337/run-latest.json | head -1)
 
   echo -e "${GREEN}✅ Contracts deployed${NC}"
   echo -e "${GREEN}   Horsey: $CONTRACT_ADDRESS${NC}"
   echo -e "${GREEN}   MockEntropy: $ENTROPY_ADDRESS${NC}"
+  echo -e "${GREEN}   TestCoin: $TESTCOIN_ADDRESS${NC}"
 
   cd "$SCRIPT_DIR"
 

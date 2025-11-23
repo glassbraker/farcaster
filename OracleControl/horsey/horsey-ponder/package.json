@@ -12,8 +12,9 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "ponder": "^0.14.4",
     "hono": "^4.5.0",
+    "jq": "^1.7.2",
+    "ponder": "^0.14.4",
     "viem": "^2.21.3"
   },
   "devDependencies": {
