@@ -169,6 +169,7 @@ export function HomeTab() {
         <div id="white-bars-root" className="space-y-3" />
       </section>
 
+
       <section>
         <h2 className="text-xl font-bold mt-4 mb-4">Your Stats</h2>
         <div className="grid grid-cols-3 gap-3">

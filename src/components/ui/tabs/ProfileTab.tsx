@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useWallet } from "~/lib/wallet-context";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -8,7 +8,7 @@ import { Badge } from "~/components/ui/badge";
 import { Card } from "~/components/ui/card";
 import { Coins } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { bet } from "ponder:schema";
+import { getBadges } from "~/lib/badges";
 
 /**
  * ProfileTab displays user info, wallet, achievements, and recent activity.
@@ -38,42 +38,7 @@ export function ProfileTab() {
         });
     };
 
-    const badges = [
-        {
-            id: 1,
-            name: "First Bet",
-            img: "/AchievementsBadges/1.png",
-            description: "Awarded for placing your first bet.",
-            unlocked: bets.length >= 1, //unlock until user place 1 bet
-        },
-        {
-            id: 2,
-            name: "Winner",
-            img: "/AchievementsBadges/2.png",
-            description: "Earned by winning your first race.",
-            unlocked: bets.some(b => b.status === "won"),
-        },
-        {
-            id: 3,
-            name: "Lucky Streak",
-            img: "/AchievementsBadges/3.png",
-            description: "Earned by winning three bets in a row.",
-            unlocked: (() => {
-                const wins = bets
-                    .filter(b => b.status === "won")
-                    .sort((a, b) => a.timestamp - b.timestamp);
-    
-                let streak = 1;
-                for (let i = 1; i < wins.length; i++) {
-                    if (wins[i - 1].timestamp < wins[i].timestamp) streak++;
-                    else streak = 1;
-                }
-                return streak >= 3;
-            })(),
-
-        },
-        
-    ];
+    const badges = useMemo(() => getBadges(bets), [bets]);
 
     return (
         <div className="min-h-screen pb-20">
