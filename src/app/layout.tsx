@@ -21,12 +21,12 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
-          <WalletProvider>
             <Providers>
-              {children}
+              <WalletProvider>
+                {children}
+              </WalletProvider>
               <Toaster />
             </Providers>
-          </WalletProvider>
       </body>
     </html>
   );

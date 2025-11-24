@@ -16,8 +16,8 @@ export default function App(
   { title }: { title?: string } = { title: APP_NAME }
 ) {
   return (
-    // <WagmiProvider config={wagmiConfig}>
+    <WagmiProvider config={wagmiConfig}>
       <AppComponent title={title} />
-    // </WagmiProvider>
+    </WagmiProvider>
   );
 }
