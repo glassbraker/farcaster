@@ -64,7 +64,6 @@ export function ProfileTab() {
       });
       return;
     }
-
     try {
       await connect({ connector: rabbyConnector });
       toast("Connected with Rabby");
