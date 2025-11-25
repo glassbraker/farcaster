@@ -64,6 +64,7 @@ export function ProfileTab() {
       });
       return;
     }
+
     try {
       await connect({ connector: rabbyConnector });
       toast("Connected with Rabby");
@@ -119,7 +120,7 @@ export function ProfileTab() {
   };
 
     //Achievement badges helper function
-    const [selectedBadge, setSelectedBadge] = useState(null);
+      const [selectedBadge, setSelectedBadge] = useState(null);
     const badges = useMemo(() => getBadges(bets), [bets]);
 
   // --- DISPLAY HELPERS ---
