@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-import { Clock, TrendingUp } from "lucide-react";
+import { Coins, Clock, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { useWallet } from "~/lib/wallet-context";
@@ -169,35 +169,46 @@ export function HomeTab() {
         <div id="white-bars-root" className="space-y-3" />
       </section>
 
+
       <section>
         <h2 className="text-xl font-bold mt-4 mb-4">Your Stats</h2>
         <div className="grid grid-cols-3 gap-3">
+          
           <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{stats.totalBets}</div>
-            <div className="text-xs text-muted-foreground mt-1">Total Bets</div>
-          </Card>
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{stats.totalWins}</div>
-            <div className="text-xs text-muted-foreground mt-1">Wins</div>
-          </Card>
-          <Card className="p-4 text-center">
-            <div className="flex items-center justify-center gap-1">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-2xl font-bold text-primary">{stats.winRate.toFixed(0)}%</span>
+            <div className="text-2xl font-bold text-primary">
+              {stats.totalBets}
             </div>
-            <div className="text-xs text-muted-foreground mt-1">Win Rate</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Total Bets
+            </div>
           </Card>
+          <Card className="p-4 text-center">
+            <div className="text-2xl font-bold text-primary">
+              {stats.totalWins}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Wins
+            </div>
+          </Card>
+          <Card className="p-4 text-center">
+            <div className="text-2xl font-bold text-primary">
+              {stats.totalWon.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1 flex justify-center items-center gap-1">
+              <Coins className="h-3 w-3 text-primary" />
+              Total Won
+            </div>
+          </Card>
+
         </div>
       </section>
+
 
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">Leaderboard</h2>
-          <span className="text-sm text-muted-foreground flex items-center gap-1">
-            <Clock className="h-4 w-4" />
-            Starting in 15m
-          </span>
         </div>
+
 
         <Card className="overflow-hidden">
           <div className="relative h-48 bg-gradient-to-br from-primary/20 to-secondary">

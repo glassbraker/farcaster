@@ -7,6 +7,8 @@ import { Badge } from "~/components/ui/badge";
 import { Card } from "~/components/ui/card";
 import { Coins, Trophy, History, TrendingUp } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import {getBadges } from "~/lib/badges";
+import { useState, useMemo } from "react";
 
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { useMiniApp } from "@neynar/react";
@@ -116,6 +118,10 @@ export function ProfileTab() {
       description: "Your bet lost.",
     });
   };
+
+    //Achievement badges helper function
+      const [selectedBadge, setSelectedBadge] = useState(null);
+    const badges = useMemo(() => getBadges(bets), [bets]);
 
   // --- DISPLAY HELPERS ---
 
@@ -256,52 +262,59 @@ export function ProfileTab() {
           </Card>
         </section>
 
-        <section>
-          <h2 className="text-xl font-bold mb-4">Statistics</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy className="h-4 w-4 text-primary" />
-                <span className="text-sm text-muted-foreground">
-                  Total Wins
-                </span>
-              </div>
-              <div className="text-3xl font-bold">{stats.totalWins}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <History className="h-4 w-4 text-primary" />
-                <span className="text-sm text-muted-foreground">
-                  Total Bets
-                </span>
-              </div>
-              <div className="text-3xl font-bold">{stats.totalBets}</div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm text-muted-foreground">
-                  Win Rate
-                </span>
-              </div>
-              <div className="text-3xl font-bold">
-                {stats.winRate.toFixed(0)}%
-              </div>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Coins className="h-4 w-4 text-primary" />
-                <span className="text-sm text-muted-foreground">
-                  Total Won
-                </span>
-              </div>
-              <div className="text-3xl font-bold">
-                {stats.totalWon.toLocaleString()}
-              </div>
-            </Card>
-          </div>
-        </section>
+   {/*Achievement sections*/}
+   <section>
+        <h2 className="text-xl font-bold mb-4">Achievements</h2>
+        <div className="grid grid-cols-3 gap-4 text-center">
+            {badges.map((badge) => (
+                <div key={badge.id}>
+                    <button
+                        onClick={() => badge.unlocked && setSelectedBadge(badge)}
+                        disabled={!badge.unlocked}
+                        className="flex flex-col items-center hover:scale-105 transition-transform disabled:cursor-not-allowed"                
+                    >
+                        <img
+                            src={badge.img}
+                            alt={badge.name}
+                            className={`w-20 h-20 rounded-full object-cover transition-all
+                            ${badge.unlocked ? "" : "opacity-30 grayscale"}`}
+                        />
+                        <span className={`mt-2 text-sm font-medium ${badge.unlocked ? "" : "text-muted-foreground"}`} >{badge.name}</span>
+                    </button>
+                </div>
+            ))}
+        </div>
 
+    {/* Simple Popup Modal */}
+        {selectedBadge && (
+            <div
+                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                onClick={() => setSelectedBadge(null)}
+            >
+                <div
+                    className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg max-w-sm text-center border border-border"
+                    style={{ backgroundColor: "#111827", borderColor: "#1f2937" }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <img
+                        src={selectedBadge.img}
+                        alt={selectedBadge.name}
+                        className="w-24 h-24 mx-auto rounded-full"
+                    />
+                    <h3 className="text-lg font-bold mt-4">{selectedBadge.name}</h3>
+
+                    <p className="text-sm text-muted-foreground mt-2">
+                        {selectedBadge.description}
+                    </p>
+                    <Button className="mt-4" onClick={() => setSelectedBadge(null)}>
+                        Close
+                    </Button>
+                </div>
+            </div>
+        )}
+    </section>
+
+    {/*Recent Activity Sections*/}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Recent Activity</h2>
