@@ -3,7 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import {Connection} from "~/lib/connection"
-import {useBalance, useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract} from "wagmi"
+import {useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract} from "wagmi"
 import {parseEther} from "viem"
 import {TEST_COIN_ADDRESS} from "~/lib/TestCoin.address.ts"
 import {TestCoinAbi} from "~/lib/abis/TestCoinAbi.ts"
@@ -42,76 +42,95 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-    const {address} = useAccount()
-    // const {data: balance} = useBalance({address: address, chainId: anvil.id})
-        const {data: balance} = useReadContract({address: TEST_COIN_ADDRESS, abi: TestCoinAbi, functionName: "balanceOf", args: [address]})
-    // const [balance, setBalance] = useState(1000)
-    const [bets, setBets] = useState<Bet[]>([])
+    const { address } = useAccount();
+    const { data: balance, refetch: refetchBalance } = useReadContract({
+        address: TEST_COIN_ADDRESS,
+        abi: TestCoinAbi,
+        functionName: "balanceOf",
+        args: [address],
+        chainId: anvil.id,
+    });
+    const [bets, setBets] = useState<Bet[]>([]);
 
     // Load from localStorage on mount
     useEffect(() => {
-        // const savedBalance = localStorage.getItem("wallet-balance")
-        const savedBets = localStorage.getItem("wallet-bets")
-
-        // if (savedBalance) setBalance(Number.parseFloat(savedBalance))
-        if (savedBets) setBets(JSON.parse(savedBets))
+        const savedBets = localStorage.getItem("wallet-bets");
+        if (savedBets) setBets(JSON.parse(savedBets));
     }, [])
 
     // Save to localStorage whenever balance or bets change
     useEffect(() => {
-        // localStorage.setItem("wallet-balance", balance.toString())
+        // No-op: balance is always read from contract
     }, [balance])
 
     useEffect(() => {
-        localStorage.setItem("wallet-bets", JSON.stringify(bets))
+        localStorage.setItem("wallet-bets", JSON.stringify(bets));
     }, [bets])
 
     const {writeContract, data: txHash} = useWriteContract();
     const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
     const addBet = async (bet: Omit<Bet, "id" | "timestamp" | "status">) => {
+        if (!address) return;
+        // Transfer coins to contract (simulate bet)
+        await writeContract({
+            address: TEST_COIN_ADDRESS,
+            abi: TestCoinAbi,
+            functionName: "transfer",
+            args: ["0x0000000000000000000000000000000000000000", parseEther(bet.amount.toString())], // You may want to send to a betting contract address
+            chainId: anvil.id,
+        });
+        refetchBalance();
         const newBet: Bet = {
             ...bet,
             id: `bet-${Date.now()}-${Math.random()}`,
             timestamp: Date.now(),
             status: "pending",
-        }
-        setBets((prev) => [newBet, ...prev])
-        // setBalance((prev) => prev - bet.amount)
-        // if (!address) return;
-        // await useWriteContract({
-        //     address: TEST_COIN_ADDRESS,
-        //     abi: TestCoinAbi,
-        //     functionName: "burn",
-        //     args: [address, parseEther(bet.amount.toString())]
-        // })
+        };
+        setBets((prev: Bet[]) => [newBet, ...prev]);
     }
 
     const updateBetStatus = (betId: string, status: "won" | "lost") => {
-        setBets((prev) =>
-            prev.map((bet) => {
+        setBets((prev: Bet[]) =>
+            prev.map((bet: Bet) => {
                 if (bet.id === betId && bet.status === "pending") {
-                    if (status === "won") {
-                        // setBalance((b) => b + bet.potentialWin)
+                    if (status === "won" && address) {
+                        // Mint coins to user for win
+                        writeContract({
+                            address: TEST_COIN_ADDRESS,
+                            abi: TestCoinAbi,
+                            functionName: "mint",
+                            args: [address, parseEther(bet.potentialWin.toString())],
+                            chainId: anvil.id,
+                        });
+                        refetchBalance();
                     }
-                    return { ...bet, status }
+                    return { ...bet, status };
                 }
-                return bet
-            }),
-        )
+                return bet;
+            })
+        );
     }
 
     const addCoins = (amount: number) => {
-        // setBalance((prev) => prev + amount)
+        if (!address) return;
+        writeContract({
+            address: TEST_COIN_ADDRESS,
+            abi: TestCoinAbi,
+            functionName: "mint",
+            args: [address, parseEther(amount.toString())],
+            chainId: anvil.id,
+        });
+        refetchBalance();
     }
 
     const stats = {
         totalBets: bets.length,
-        totalWins: bets.filter((b) => b.status === "won").length,
-        totalLosses: bets.filter((b) => b.status === "lost").length,
-        winRate: bets.length > 0 ? (bets.filter((b) => b.status === "won").length / bets.length) * 100 : 0,
-        totalWon: bets.filter((b) => b.status === "won").reduce((sum, b) => sum + b.potentialWin, 0),
-        totalLost: bets.filter((b) => b.status === "lost").reduce((sum, b) => sum + b.amount, 0),
+        totalWins: bets.filter((b: Bet) => b.status === "won").length,
+        totalLosses: bets.filter((b: Bet) => b.status === "lost").length,
+        winRate: bets.length > 0 ? (bets.filter((b: Bet) => b.status === "won").length / bets.length) * 100 : 0,
+        totalWon: bets.filter((b: Bet) => b.status === "won").reduce((sum: number, b: Bet) => sum + b.potentialWin, 0),
+        totalLost: bets.filter((b: Bet) => b.status === "lost").reduce((sum: number, b: Bet) => sum + b.amount, 0),
     }
 
     return (
