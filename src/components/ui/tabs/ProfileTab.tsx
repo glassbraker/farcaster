@@ -17,7 +17,7 @@ export function ProfileTab() {
   const { balance, bets, stats, addCoins, updateBetStatus } = useWallet();
 
   // wagmi wallet state
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, refetch } = useAccount();
   const { connectors, connect, status: connectStatus } = useConnect();
   const { disconnect } = useDisconnect();
 
@@ -153,6 +153,7 @@ export function ProfileTab() {
                       toast("Wallet connected!", {
                         description: `Connected to ${connector.name}`,
                       });
+                      refetch();
                       setShowWalletOptions(false);
                     } catch (err) {
                       toast("Wallet connection failed", {

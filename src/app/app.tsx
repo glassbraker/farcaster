@@ -7,6 +7,7 @@ import { WagmiProvider, useAccount } from 'wagmi'
 import { config } from '~/lib/config'
 import { Connection } from '~/lib/connection'
 import { WalletOptions } from '~/lib/wallet-options'
+import { SendTransaction } from '~/lib/send-transaction'
 
 // note: dynamic import is required for components that use the Frame SDK
 const AppComponent = dynamic(() => import("~/components/App"), {
@@ -29,6 +30,7 @@ export default function App(
       <QueryClientProvider client={queryClient}>
         <AppComponent title={title} />
         {/* <ConnectWallet /> */}
+        {/* <SendTransaction /> */}
       </QueryClientProvider>
     </WagmiProvider>
   )

@@ -1,0 +1,21 @@
+{
+  "name": "coinscript",
+  "version": "1.0.0",
+  "description": "",
+  "main": "send1000Coins.js",
+  "dependencies": {
+    "aes-js": "^4.0.0-beta.5",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.15.0",
+    "tslib": "^2.7.0",
+    "undici-types": "^6.19.8",
+    "ws": "^8.17.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
