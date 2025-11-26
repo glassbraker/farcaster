@@ -6,6 +6,7 @@ import { useAccount, useReadContract, useWriteContract, useWaitForTransactionRec
 import { wagmiConfig } from '~/lib/wagmi';
 import { TestCoinAbi } from "~/lib/abis/TestCoinAbi.ts";
 import {TEST_COIN_ADDRESS} from "~/lib/TestCoin.address.ts";
+import {ethers} from "ethers";
 
 interface Bet {
     id: string
@@ -44,12 +45,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const [bets, setBets] = useState<Bet[]>([]);
 
     // On-chain TestCoin balance
-    const { data: onChainBalance, refetch: refetchBalance } = useReadContract({
+    const { data: onChainBalance } = useReadContract({
         address: TEST_COIN_ADDRESS,
         abi: TestCoinAbi,
         functionName: "balanceOf",
-        args: [address],
+        args: [address]
     });
+    const balance = onChainBalance ? Number(onChainBalance) / 1e18 : 0;
 
     // Save bets to localStorage (optional, can be replaced with Ponder sync)
     useEffect(() => {
@@ -71,7 +73,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             address: TEST_COIN_ADDRESS,
             abi: TestCoinAbi,
             functionName: "mint",
-            args: [address, amount],
+            args: [address, ethers.parseEther(amount.toString())],
         });
         // Refetch balance after mint
         refetchBalance();
@@ -112,7 +114,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <WalletContext.Provider value={{
-            balance: Number(onChainBalance ?? 0),
+            balance: Number(balance ?? 0),
             bets,
             addBet,
             updateBetStatus,

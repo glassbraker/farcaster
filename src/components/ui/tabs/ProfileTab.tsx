@@ -8,7 +8,7 @@ import { Card } from "~/components/ui/card";
 import { Coins, Trophy, History, TrendingUp } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
-import { useAccount, useConnect, useDisconnect, WagmiProvider} from "wagmi";
+import { useAccount, useConnect, useDisconnect} from "wagmi";
 import { wagmiConfig } from "~/lib/wagmi";
 import { useMiniApp } from "@neynar/react";
 
@@ -97,10 +97,11 @@ export function ProfileTab() {
     });
   };
 
+
   const handleAddCoins = () => {
     addCoins(500);
     toast("Coins Added!", {
-      description: "500 test coins have been added to your wallet.",
+      description: `500 test coins have been added to your wallet.`
     });
   };
 
