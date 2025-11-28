@@ -101,6 +101,7 @@ function FirstVisitDisclaimer() {
 }
 
 function DailyRewardChest() {
+  const { addCoins } = useWallet();
   const LS_KEY = "dailyRewardLastClaim";
   const DAY_MS = 24 * 60 * 60 * 1000;
   const accent = "#ff3b3b";
@@ -140,6 +141,7 @@ function DailyRewardChest() {
     const t = Date.now();
     localStorage.setItem(LS_KEY, String(t));
     setLastClaim(t);
+    addCoins(500);
     alert("You claimed your daily reward.");
   }
 
