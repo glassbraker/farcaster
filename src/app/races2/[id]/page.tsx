@@ -22,9 +22,6 @@ import {
   parseEther,
 } from "viem";
 
-// Minimal ABI for RaceParimutuelETH_VRF.getRace(uint256)
-// (still here in case you keep the chain-read fallback;
-// your Horsey contract does NOT need to implement this.)
 const RACE_ABI = [
   {
     type: "function",
@@ -47,8 +44,6 @@ const RACE_ABI = [
 
 // ---- Horsey (betting) ABI & addresses ----
 
-// Horsey: function bet(Horse _horse) public payable returns (uint256)
-// In ABI we treat the enum as uint8.
 const HORSEY_ABI = [
   {
     type: "function",
@@ -63,22 +58,18 @@ const HORSEY_ABI = [
 const HORSEY_ADDRESS = "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512";
 const MOCK_ENTROPY_ADDRESS = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
 
-// For fallback read, we’ll prefer window.ethereum; else use RPC_URL if present.
-const RPC_URL = "http://block.techiegogo.com:8545"; // or http://127.0.0.1:8545
-// Keeping this constant for the getRace fallback (if you still use it)
+const RPC_URL = "http://127.0.0.1:8545"; 
 const RACE_ADDRESS = HORSEY_ADDRESS;
 
-// How many ETH each “coin” represents on-chain.
-// Adjust to whatever mapping you actually want.
-const COIN_TO_ETH = 0.001;
+const COIN_TO_ETH = 1.00;
 
 // ---------------- UI Types ----------------
 type UiHorse = {
-  id: number; // index in racers[]
+  id: number; 
   name: string;
-  jockey: string; // not on-chain; “—”
-  odds: number; // implied multiple
-  color: string; // tailwind class
+  jockey: string; 
+  odds: number; 
+  color: string; 
 };
 
 type UiRace = {
@@ -142,7 +133,6 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
   const [betAmounts, setBetAmounts] = useState<Record<number, string>>({});
   const [placingOnChain, setPlacingOnChain] = useState(false);
 
-  // ---- Try API first, then fall back to direct chain read via viem ----
   useEffect(() => {
     let alive = true;
 
@@ -423,7 +413,6 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
     try {
       setPlacingOnChain(true);
 
-      // 1) Send on-chain tx(s) to Horsey
       await placeOnChainBets(
         finalBets.map((b) => ({
           raceId: b.raceId,
@@ -432,7 +421,6 @@ export default function RaceDetailPage({ params }: { params: { id: string } }) {
         })),
       );
 
-      // 2) Keep your existing local “coins” wallet + storage flow
       const existingBets = JSON.parse(
         localStorage.getItem("userBets") || "[]",
       );
