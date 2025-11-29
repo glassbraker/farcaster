@@ -70,7 +70,7 @@ const RACE_ADDRESS = HORSEY_ADDRESS;
 
 // How many ETH each “coin” represents on-chain.
 // Adjust to whatever mapping you actually want.
-const COIN_TO_ETH = 0.001;
+const COIN_TO_ETH = 1.00;
 
 // ---------------- UI Types ----------------
 type UiHorse = {

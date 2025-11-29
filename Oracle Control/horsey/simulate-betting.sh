@@ -123,8 +123,8 @@ run_race() {
 
   # Mine blocks to simulate time passing
   for ((i=1; i<=betting_blocks; i++)); do
+      sleep 500
     cast rpc anvil_mine 1 --rpc-url http://127.0.0.1:8545 > /dev/null 2>&1
-    sleep 50
   done
 
   echo -e "${YELLOW}🔒 Betting window should be closed now${NC}"
