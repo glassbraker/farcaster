@@ -3,34 +3,28 @@ import { NextResponse } from "next/server";
 import { createPublicClient, http, formatEther } from "viem";
 
 // ----------------------------------------------------------------------------
-// Config (you can move to .env.local as needed)
+// Config
 // ----------------------------------------------------------------------------
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
 const PONDER_SQL_URL =
   process.env.PONDER_SQL_URL || "http://localhost:42069/sql";
 
-// Fallback average block time (seconds) if RPC sampling fails
 const FALLBACK_BLOCK_TIME_SEC = Number(
   process.env.FALLBACK_BLOCK_TIME_SEC || 12,
 );
 
-// Sample window for average block time
 const AVG_BLOCK_SAMPLE = Number(process.env.AVG_BLOCK_SAMPLE || 50);
 
-// Optional: max races to pull from Ponder before filtering/sorting
 const MAX_RACES_FETCH = Number(process.env.MAX_RACES_FETCH || 100);
 
-// Default fallback horse count if Ponder / chain can't tell us
 const DEFAULT_HORSE_COUNT = Number(process.env.DEFAULT_HORSE_COUNT || 7);
 
-// Horsey contract address (override in env if needed)
 const HORSEY_ADDRESS =
   (process.env.HORSEY_ADDRESS as `0x${string}`) ??
   ("0xe7f1725e7734ce288f8367e1bb143e90bb3f0512" as const);
 
 const client = createPublicClient({ transport: http(RPC_URL) });
 
-// Types that mirror your App + Ponder
 type RaceRow = {
   id: string;
   race_index: string; // numeric string
@@ -54,7 +48,6 @@ type MaxHorseRow = {
   max_horse: number | null;
 };
 
-// Minimal ABI for getHorseNames() in Horsey
 const HORSEY_ABI = [
   {
     type: "function",
@@ -132,7 +125,7 @@ async function getHorseNamesFromChain(): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Shaping (keeps existing API output contract, adds block fields)
+// Shaping 
 // ---------------------------------------------------------------------------
 function shapeRaceFromPonder(opts: {
   race: RaceRow;
@@ -181,7 +174,6 @@ function shapeRaceFromPonder(opts: {
   );
   const startTimeSec = nowSec - elapsedBlocks * avgBlockTimeSec;
 
-  // Horse IDs are 1..horseCount; names come from Horsey.getHorseNames()
   const horseIds = Array.from({ length: horseCount }, (_, i) => i + 1);
 
   const racers = horseIds.map((h, idx) => {
@@ -269,7 +261,6 @@ export async function GET() {
       getHorseNamesFromChain(),
     ]);
 
-    // How many horses do we have globally?
     const globalHorseCountFromBets =
       maxHorseRows[0]?.max_horse && maxHorseRows[0].max_horse > 0
         ? maxHorseRows[0].max_horse

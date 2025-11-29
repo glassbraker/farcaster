@@ -578,7 +578,7 @@ export function ProfileTab() {
 
     const shareIdStr = shareId.toString();
 
-    // ✅ Immediately mark as claimed locally so the button disappears
+    //  Immediately mark as claimed locally so the button disappears
     markLocalClaimed(shareIdStr);
     setPonderBets((prev) =>
       prev.map((b) => {
