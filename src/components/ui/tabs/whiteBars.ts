@@ -263,7 +263,7 @@ function padWithPlaceholders(items: TimerItem[], needed: number): TimerItem[] {
 function patchBars(container: HTMLElement, items: TimerItem[], limit = MAX_ON_SCREEN) {
   const desired = items.slice(0, limit);
   const existing = Array.from(container.querySelectorAll<HTMLDivElement>('div[data-key]'));
-  const byKey = new Map(existing.map((el) => [el.getAttribute('data-key')!, el]));
+  const byKey = new Map(existing.map((el) => [el.getAttribute("data-key")!, el]));
   const used = new Set<string>();
 
   desired.forEach((item, idx) => {
@@ -369,29 +369,49 @@ function startHeadListener(refreshAll: () => Promise<void>) {
 export async function startWhiteBars() {
   const container = ensureContainer();
 
+  // dynamic refresh interval state
+  let refreshInterval: number | null = null;
+  let isFastPolling = false; // true => 500ms, false => 10s
+
+  const setRefreshInterval = (fast: boolean) => {
+    if (fast === isFastPolling && refreshInterval !== null) {
+      return; // no change
+    }
+    if (refreshInterval !== null) {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+    isFastPolling = fast;
+    const delay = fast ? 500 : 10000;
+    refreshInterval = window.setInterval(() => {
+      refreshAll().catch(console.error);
+    }, delay) as unknown as number;
+  };
+
   async function refreshAll() {
     const data = await loadFromServer();
     const fresh = sortAndFilter(data);
     const padded = padWithPlaceholders(fresh, MAX_ON_SCREEN);
     patchBars(container, padded);
+
+    // 🔍 If there are no real races (fresh.length === 0),
+    // everything on screen is TBD → poll aggressively (0.5s).
+    // Otherwise, go back to normal (10s).
+    const allTbd = fresh.length === 0;
+    setRefreshInterval(allTbd);
   }
 
   try {
-    await refreshAll(); // initial render
+    await refreshAll(); // initial render + sets appropriate interval
   } catch (e) {
     console.error(e);
   }
-
-  // Periodic refresh to pick up new races / resolved winners
-  const refreshInterval = setInterval(() => {
-    refreshAll().catch(console.error);
-  }, 10000);
 
   // Live head → live "N blocks" updates
   const stopHead = startHeadListener(refreshAll);
 
   return () => {
-    clearInterval(refreshInterval);
+    if (refreshInterval !== null) clearInterval(refreshInterval);
     stopHead();
     const bars = Array.from(container.querySelectorAll("div[data-key]"));
     bars.forEach((b) => b.remove());
