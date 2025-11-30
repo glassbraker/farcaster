@@ -10,6 +10,7 @@ import { Button } from "~/components/ui/button";
 import { getBadges } from "~/lib/badges";
 import { useState, useMemo, useEffect } from "react";
 import { useMiniApp } from "@neynar/react";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 import type { Abi } from "viem";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
@@ -178,6 +179,39 @@ function getShareId(bet: PonderShare): bigint | null {
   } catch {
     return null;
   }
+}
+
+export default function ProfilePicture() {
+  const [pfpUrl, setPfpUrl] = useState<string | null>(null);
+  const { context } = useMiniApp() as any;
+  const farcasterUser = context?.user;
+  const [walletAddress] = useState<string | null>(null);
+
+  const initials =
+    farcasterUser?.display_name?.[0]?.toUpperCase() ||
+    (walletAddress && walletAddress.slice(2, 4).toUpperCase()) ||
+    "U";
+
+  useEffect(() => {
+    async function loadContext() {
+      const inMini = await sdk.isInMiniApp();
+      if (!inMini) {
+        return;
+      }
+      const context = await sdk.context;
+      if (context.user?.pfpUrl) {
+        setPfpUrl(context.user.pfpUrl);
+      }
+    }
+
+    loadContext();
+  }, []);
+
+  if (!pfpUrl) {
+    return <AvatarFallback className="test-2xl font-bold">{initials}</AvatarFallback>;
+  }
+
+  return <img src={pfpUrl} alt="User avatar" width={64} height={64} />;
 }
 
 // ----------------------------------------------------------------------------
@@ -710,16 +744,11 @@ export function ProfileTab() {
       <header className="border-b border-border bg-card rounded-lg">
         <div className="max-w-lg mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20 border-2 border-primary">
-              <AvatarImage
-                src={
-                  farcasterUser?.pfp_url ??
-                  "/placeholder.svg?height=80&width=80"
-                }
-              />
-              <AvatarFallback className="text-2xl font-bold">
+            <Avatar className="h-20 w-20 border-2 border-primary flex items-center justify-center">
+              <ProfilePicture />
+              {/* <AvatarFallback className="text-2xl font-bold">
                 {initials}
-              </AvatarFallback>
+              </AvatarFallback> */}
             </Avatar>
             <div className="flex-1">
               <div className="flex items-start justify-between gap-2">
