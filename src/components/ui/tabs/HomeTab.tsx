@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-import { Clock, TrendingUp, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
-import { Coins, Clock, TrendingUp } from "lucide-react";
+import { Coins, Clock, TrendingUp, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { useWallet } from "~/lib/wallet-context";
