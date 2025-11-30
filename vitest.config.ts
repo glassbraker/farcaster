@@ -6,6 +6,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setupTests.ts"],
+    exclude: [
+      "Oracle Control/**",
+      "OracleControl/**",
+      "node_modules"
+    ],
     coverage: {
       provider: "v8",
       include: ["src"],
@@ -14,6 +19,9 @@ export default defineConfig({
         "src/app/api/**",
         "src/hooks/**",
         "src/lib/**",
+        "Oracle Control/**",
+        "OracleControl/**",
+        "node_modules"
       ],
       all: true,
       thresholds: {
