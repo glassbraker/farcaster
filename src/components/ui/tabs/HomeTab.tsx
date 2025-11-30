@@ -2,6 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Clock, TrendingUp, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { Coins, Clock, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { Button } from "~/components/ui/button";
 import { useWallet } from "~/lib/wallet-context";
 import { Card } from "~/components/ui/card";
 import { startWhiteBars } from "./whiteBars";
@@ -360,6 +363,7 @@ export function HomeTab() {
       <section>
         <h2 className="text-xl font-bold mt-4 mb-4">Your Stats</h2>
         <div className="grid grid-cols-3 gap-3">
+          
           <Card className="p-4 text-center">
             <div className="text-2xl font-bold text-primary">{totalBets}</div>
             <div className="text-xs text-muted-foreground mt-1">Total Bets</div>
@@ -373,10 +377,11 @@ export function HomeTab() {
               <TrendingUp className="h-4 w-4 text-primary" />
               <span className="text-2xl font-bold text-primary">{winRate.toFixed(0)}%</span>
             </div>
-            <div className="text-xs text-muted-foreground mt-1">Win Rate</div>
           </Card>
+
         </div>
       </section>
+
 
       <section>
         <div className="flex items-center justify-between mb-4">
@@ -386,6 +391,7 @@ export function HomeTab() {
             Live top bettors
           </span>
         </div>
+
 
         <Card className="overflow-hidden">
           <div className="relative h-48 bg-gradient-to-br from-primary/20 to-secondary">
