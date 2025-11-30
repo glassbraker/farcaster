@@ -35,6 +35,21 @@ type ChatMessage = {
   timestamp: string;
 };
 
+const COLOR_CLASSES = [
+  "bg-blue-600",
+  "bg-rose-600",
+  "bg-emerald-600",
+  "bg-amber-600",
+  "bg-fuchsia-600",
+  "bg-cyan-600",
+  "bg-indigo-600",
+  "bg-lime-600",
+  "bg-teal-600",
+  "bg-orange-600",
+  "bg-pink-600",
+  "bg-purple-600",
+];
+
 export default function HorseRoomPage() {
   const router = useRouter();
   const { id: raceId } = useParams();
@@ -63,41 +78,76 @@ export default function HorseRoomPage() {
   }, []);
 
   // ---- Scroll chat to bottom on new messages ----
-  useEffect(() => {
-    if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, chatOpen]);
-
-  // ---- Load race info ----
+  const COLOR_CLASSES = [
+    "bg-blue-600",
+    "bg-rose-600",
+    "bg-emerald-600",
+    "bg-amber-600",
+    "bg-fuchsia-600",
+    "bg-cyan-600",
+    "bg-indigo-600",
+    "bg-lime-600",
+    "bg-teal-600",
+    "bg-orange-600",
+    "bg-pink-600",
+    "bg-purple-600",
+  ];
+  
   useEffect(() => {
     const loadRace = async () => {
       try {
-        const res = await fetch("/info.txt", { cache: "no-store" });
-        if (!res.ok) throw new Error(`Failed to fetch info.txt (${res.status})`);
+        // Fetch race info
+        let res = await fetch(`/api/info?full=1`, { cache: "no-store" });
+        if (!res.ok) {
+          res = await fetch(`/api/info`, { cache: "no-store" });
+          if (!res.ok) throw new Error("Failed to load race info");
+        }
   
         const data = await res.json();
-        const found = data.find((r: any) => r.id === raceId);
+  
+        // Find the race by ID
+        const found =
+          data.find((r: any) => String(r.raceId) === String(raceId)) ??
+          data.find((r: any) => String(r.id) === String(raceId));
         if (!found) throw new Error(`Race ${raceId} not found`);
   
         const raceIdNum = Number(raceId);
   
-        // Convert odds to numbers (they're strings in your file)
-        const horsesWithBets = found.horses.map((h: any) => {
-          const total = userBets
-            .filter((b) => b.horseId === Number(h.id) && b.raceId === raceIdNum)
+        const racers = Array.isArray(found.racers)
+          ? found.racers
+          : found.horses?.map((h: any) => h.name) ?? [];
+  
+        // Map horses
+        const horses: Horse[] = racers.map((name: string, index: number) => {
+          // ✅ Sum only the user bets for this horse
+          const totalBets = userBets
+            .filter((b) => b.raceId === raceIdNum && b.horseId === index)
             .reduce((sum, b) => sum + b.amount, 0);
+  
+          // Odds from API (optional, stays)
+          let odds = 1;
+          if (found.poolByRacerWei) {
+            const totalPool = BigInt(found.totalPoolWei ?? found.totalPool ?? 0);
+            const pool = BigInt(found.poolByRacerWei[index] ?? 0);
+            odds =
+              pool > 0n && totalPool > 0n
+                ? Number((totalPool * 1_000_000n) / pool) / 1_000_000
+                : 1;
+          }
+  
           return {
-            id: Number(h.id),
-            name: h.name,
-            color: h.color,
-            odds: Number(h.odds),
-            totalBets: total,
+            id: index,
+            name,
+            color: COLOR_CLASSES[index % COLOR_CLASSES.length],
+            odds,
+            totalBets, // ✅ your actual total bet
           };
         });
   
         setRace({
-          id: Number(found.id),
-          name: found.name,
-          horses: horsesWithBets,
+          id: raceIdNum,
+          name: found.name ?? `Race ${raceId}`,
+          horses,
         });
       } catch (err) {
         console.error(err);
@@ -106,6 +156,7 @@ export default function HorseRoomPage() {
   
     loadRace();
   }, [raceId, userBets]);
+  
 
   const sortedHorses = race ? [...race.horses].sort((a, b) => a.odds - b.odds) : [];
 
@@ -162,6 +213,19 @@ export default function HorseRoomPage() {
       }
     }
   };
+
+  // ---- Auto-scroll chat ----
+useEffect(() => {
+  const chatContainer = chatEndRef.current?.parentElement;
+  if (!chatContainer) return;
+
+  const isNearBottom =
+    chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 50;
+
+  if (isNearBottom) {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+}, [messages]);
 
   // ---- CLO & Chat toggles ----
   const toggleCLO = () => {
@@ -269,10 +333,7 @@ export default function HorseRoomPage() {
                 onPaste={handlePaste}
                 className="flex-1 p-1 rounded-md border border-gray-600 bg-gray-900 text-white text-sm"
               />
-              <label className="cursor-pointer p-1 bg-gray-800 rounded-md text-sm">
-                📎
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-              </label>
+              
               <Button size="sm" onClick={handleSendMessage}>Send</Button>
             </div>
           </Card>
