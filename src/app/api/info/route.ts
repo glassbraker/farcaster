@@ -3,46 +3,67 @@ import { NextResponse } from "next/server";
 import { createPublicClient, http, formatEther } from "viem";
 
 // ----------------------------------------------------------------------------
-// Config (you can move to .env.local as needed)
+// Config
 // ----------------------------------------------------------------------------
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
-const PONDER_SQL_URL = process.env.PONDER_SQL_URL || "http://localhost:42069/sql";
+const PONDER_SQL_URL =
+  process.env.PONDER_SQL_URL || "http://localhost:42069/sql";
 
-// Fallback average block time (seconds) if RPC sampling fails
-const FALLBACK_BLOCK_TIME_SEC = Number(process.env.FALLBACK_BLOCK_TIME_SEC || 12);
+const FALLBACK_BLOCK_TIME_SEC = Number(
+  process.env.FALLBACK_BLOCK_TIME_SEC || 12,
+);
 
-// Sample window for average block time
 const AVG_BLOCK_SAMPLE = Number(process.env.AVG_BLOCK_SAMPLE || 50);
 
-// Optional: max races to pull from Ponder before filtering/sorting
 const MAX_RACES_FETCH = Number(process.env.MAX_RACES_FETCH || 100);
+
+const DEFAULT_HORSE_COUNT = Number(process.env.DEFAULT_HORSE_COUNT || 7);
+
+const HORSEY_ADDRESS =
+  (process.env.HORSEY_ADDRESS as `0x${string}`) ??
+  ("0xe7f1725e7734ce288f8367e1bb143e90bb3f0512" as const);
 
 const client = createPublicClient({ transport: http(RPC_URL) });
 
-// Types that mirror your App + Ponder
 type RaceRow = {
   id: string;
-  race_index: string;              // numeric string
-  start_block: string;             // numeric string
-  end_block: string;               // numeric string
-  requested_block: string | null;  // numeric string or null
+  race_index: string; // numeric string
+  start_block: string; // numeric string
+  end_block: string; // numeric string
+  requested_block: string | null; // numeric string or null
   sequence_number: string | null;
-  winner: number | null;           // integer or null
-  resolved_timestamp: string | null;         // ISO or timestamp string
-  resolved_block_number: string | null;      // numeric string or null
-  resolved_transaction_hash: string | null;  // hex or null
+  winner: number | null; // integer or null
+  resolved_timestamp: string | null; // ISO or timestamp string
+  resolved_block_number: string | null; // numeric string or null
+  resolved_transaction_hash: string | null; // hex or null
 };
 
 type BetAggRow = {
-  race_index: string;   // numeric string
-  horse: number;        // integer (1-indexed in your UI)
-  total_wei: string;    // string number (wei)
+  race_index: string; // numeric string
+  horse: number; // integer (enum index, 1-based)
+  total_wei: string; // string number (wei)
 };
+
+type MaxHorseRow = {
+  max_horse: number | null;
+};
+
+const HORSEY_ABI = [
+  {
+    type: "function",
+    name: "getHorseNames",
+    stateMutability: "pure",
+    inputs: [],
+    outputs: [{ type: "string[7]" }],
+  },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-async function ponderSql<T = any>(query: string): Promise<{ rows: T[] }> {
+async function ponderSql<T = any>(
+  query: string,
+): Promise<{ rows: T[] }> {
   const res = await fetch(PONDER_SQL_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -51,12 +72,16 @@ async function ponderSql<T = any>(query: string): Promise<{ rows: T[] }> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Ponder SQL error (${res.status}): ${text || "Unknown error"}`);
+    throw new Error(
+      `Ponder SQL error (${res.status}): ${text || "Unknown error"}`,
+    );
   }
   return res.json();
 }
 
-async function getAvgBlockTimeSec(sample = AVG_BLOCK_SAMPLE): Promise<number> {
+async function getAvgBlockTimeSec(
+  sample = AVG_BLOCK_SAMPLE,
+): Promise<number> {
   try {
     const headNum = await client.getBlockNumber();
     if (headNum <= 0n) return FALLBACK_BLOCK_TIME_SEC;
@@ -82,16 +107,42 @@ function toEthStrings(arr: bigint[]): string[] {
   return arr.map((x) => formatEther(x));
 }
 
+// Read horse names from the Horsey contract
+async function getHorseNamesFromChain(): Promise<string[]> {
+  try {
+    const result = await client.readContract({
+      address: HORSEY_ADDRESS,
+      abi: HORSEY_ABI,
+      functionName: "getHorseNames",
+    });
+
+    // result is string[7]
+    return Array.from(result as string[]);
+  } catch (err) {
+    console.error("⚠️ Failed to fetch horse names from chain:", err);
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Shaping (keeps existing API output contract, adds block fields)
+// Shaping 
 // ---------------------------------------------------------------------------
 function shapeRaceFromPonder(opts: {
   race: RaceRow;
   currentBlock: bigint;
   avgBlockTimeSec: number;
   poolByHorse: Map<number, bigint>; // horse -> wei
+  horseCount: number;
+  horseNames: string[];
 }) {
-  const { race, currentBlock, avgBlockTimeSec, poolByHorse } = opts;
+  const {
+    race,
+    currentBlock,
+    avgBlockTimeSec,
+    poolByHorse,
+    horseCount,
+    horseNames,
+  } = opts;
 
   const raceIndex = Number(race.race_index);
   const startBlock = BigInt(race.start_block);
@@ -105,25 +156,43 @@ function shapeRaceFromPonder(opts: {
 
   let lockTimeSec: number;
   if (settled) {
-    const resolvedMs = race.resolved_timestamp ? Date.parse(race.resolved_timestamp) : Date.now();
-    lockTimeSec = Math.floor((isNaN(resolvedMs) ? Date.now() : resolvedMs) / 1000);
+    const resolvedMs = race.resolved_timestamp
+      ? Date.parse(race.resolved_timestamp)
+      : Date.now();
+    lockTimeSec = Math.floor(
+      (isNaN(resolvedMs) ? Date.now() : resolvedMs) / 1000,
+    );
   } else {
-    const remainingBlocks = Number(endBlock > currentBlock ? endBlock - currentBlock : 0n);
+    const remainingBlocks = Number(
+      endBlock > currentBlock ? endBlock - currentBlock : 0n,
+    );
     lockTimeSec = nowSec + remainingBlocks * avgBlockTimeSec;
   }
 
-  const elapsedBlocks = Number(currentBlock > startBlock ? currentBlock - startBlock : 0n);
+  const elapsedBlocks = Number(
+    currentBlock > startBlock ? currentBlock - startBlock : 0n,
+  );
   const startTimeSec = nowSec - elapsedBlocks * avgBlockTimeSec;
 
-  const horsesWithBets = [...poolByHorse.keys()].sort((a, b) => a - b);
-  const racers = horsesWithBets.map((h) => `Horse ${h}`);
+  const horseIds = Array.from({ length: horseCount }, (_, i) => i + 1);
 
-  const poolArray: [number, bigint][] = horsesWithBets.map((h) => [h, poolByHorse.get(h)!]);
-  const poolByRacerWei = poolArray.map(([, v]) => v);
+  const racers = horseIds.map((h, idx) => {
+    const name = horseNames[idx] ?? horseNames[h - 1];
+    return name && name.length ? name : `Horse ${h}`;
+  });
+
+  const poolByRacerWei = horseIds.map(
+    (h) => poolByHorse.get(h) ?? 0n,
+  );
   const totalPoolWei = bigintSum(poolByRacerWei);
 
-  const locked = !settled && lockTimeSec <= nowSec;
-  const status: "open" | "locked" | "settled" = settled ? "settled" : locked ? "locked" : "open";
+  const locked =
+    !settled && lockTimeSec <= nowSec;
+  const status: "open" | "locked" | "settled" = settled
+    ? "settled"
+    : locked
+    ? "locked"
+    : "open";
 
   const blocksRemainingAtResponse = Math.max(
     0,
@@ -164,7 +233,6 @@ function shapeRaceFromPonder(opts: {
     locked,
     secondsToLock: Math.max(0, lockTimeSec - nowSec),
   };
-
 }
 
 // ---------------------------------------------------------------------------
@@ -172,15 +240,37 @@ function shapeRaceFromPonder(opts: {
 // ---------------------------------------------------------------------------
 export async function GET() {
   try {
-    const [{ rows: raceRows }, { rows: betAggRows }] = await Promise.all([
-      ponderSql<RaceRow>(`SELECT * FROM race ORDER BY race_index DESC LIMIT ${MAX_RACES_FETCH}`),
+    const [
+      { rows: raceRows },
+      { rows: betAggRows },
+      { rows: maxHorseRows },
+      horseNamesFromChain,
+    ] = await Promise.all([
+      ponderSql<RaceRow>(
+        `SELECT * FROM race ORDER BY race_index DESC LIMIT ${MAX_RACES_FETCH}`,
+      ),
       ponderSql<BetAggRow>(`
         SELECT race_index, horse, SUM(CAST(amount AS NUMERIC)) AS total_wei
         FROM bet
         GROUP BY race_index, horse
       `),
+      ponderSql<MaxHorseRow>(`
+        SELECT MAX(horse) AS max_horse
+        FROM bet
+      `),
+      getHorseNamesFromChain(),
     ]);
 
+    const globalHorseCountFromBets =
+      maxHorseRows[0]?.max_horse && maxHorseRows[0].max_horse > 0
+        ? maxHorseRows[0].max_horse
+        : DEFAULT_HORSE_COUNT;
+
+    const horseNames = horseNamesFromChain;
+    const horseCount =
+      (horseNames && horseNames.length) || globalHorseCountFromBets;
+
+    // Build pool map: race_index -> (horse -> wei)
     const poolMap = new Map<number, Map<number, bigint>>();
     for (const row of betAggRows) {
       const rIdx = Number(row.race_index);
@@ -203,6 +293,8 @@ export async function GET() {
         currentBlock,
         avgBlockTimeSec,
         poolByHorse: poolMap.get(Number(race.race_index)) || new Map(),
+        horseCount,
+        horseNames,
       }),
     );
 
@@ -214,7 +306,10 @@ export async function GET() {
   } catch (e: any) {
     console.error("❌ /api/info (ponder) error:", e);
     return NextResponse.json(
-      { error: "Failed to read from Ponder", details: String(e?.message ?? e) },
+      {
+        error: "Failed to read from Ponder",
+        details: String(e?.message ?? e),
+      },
       { status: 500 },
     );
   }
